@@ -3,40 +3,125 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from pathlib import Path
+from time import perf_counter
 
-from processors.document_processor import DocumentProcessor
-from processors.document_reader import DocumentReader
-from processors.document_writer import DocumentWriter
+from ai import AIExtractionEngine
+from models import DocumentType, ProcessingResult, TrainingRecord
+from processors.document_classifier import DocumentClassifier
+from processors.pdf_processor import PDFProcessor
 
-if TYPE_CHECKING:
-    from models.training_record import TrainingRecord
+logger = logging.getLogger(__name__)
 
 
 class DocumentPipeline:
+    """Run classification, rendering, and AI extraction for a single PDF."""
+
     def __init__(
         self,
-        reader: DocumentReader,
-        processor: DocumentProcessor,
-        writer: DocumentWriter,
-    ):
-        self.reader = reader
-        self.processor = processor
-        self.writer = writer
-        self.logger = logging.getLogger(__name__)
+        *,
+        classifier: DocumentClassifier | None = None,
+        pdf_processor: PDFProcessor | None = None,
+        ai_engine: AIExtractionEngine | None = None,
+    ) -> None:
+        self.classifier = classifier or DocumentClassifier()
+        self.pdf_processor = pdf_processor or PDFProcessor()
+        self.ai_engine = ai_engine or AIExtractionEngine()
 
-    def run(self, input_path: str, output_path: str) -> None:
-        self.logger.info("Starting document pipeline")
-        documents = self.reader.read_documents(input_path)
-        self.logger.info(f"Read {len(documents)} documents")
+    def process(self, pdf_path: Path) -> ProcessingResult:
+        """Process one PDF from classification through AI extraction."""
 
-        processed_records: list[TrainingRecord] = []
-        for document in documents:
-            try:
-                record = self.processor.process(document)
-                processed_records.append(record)
-            except Exception as e:
-                self.logger.error(f"Failed to process document {document.id}: {e}")
+        start_time = perf_counter()
+        path = Path(pdf_path)
+        document_type = DocumentType.UNKNOWN
+        image_path: Path | None = None
 
-        self.writer.write_records(processed_records, output_path)
-        self.logger.info("Document pipeline completed")
+        logger.info("Starting document processing: %s", path)
+
+        try:
+            if not path.exists() or not path.is_file():
+                raise FileNotFoundError(f"PDF file does not exist: {path}")
+
+            document_type = DocumentType.from_value(self.classifier.classify(path))
+            if document_type == DocumentType.UNKNOWN:
+                document_type = self._document_type_from_folder(path)
+            rendered_page = self.pdf_processor.render_first_page(path)
+            image_path = rendered_page.image_path
+
+            extraction = self.ai_engine.extract(
+                document_type=document_type,
+                image=rendered_page.image,
+                metadata={
+                    "pdf_path": str(path),
+                    "document_type": document_type,
+                },
+            )
+            extraction_data = extraction if isinstance(extraction, dict) else extraction.to_dict()
+
+            training_record = TrainingRecord.from_dict(
+                extraction_data,
+                document_type=document_type,
+            )
+
+            if (
+                extraction_data.get("document_type")
+                and extraction_data["document_type"] != "Unknown"
+            ):
+                document_type = DocumentType.from_value(extraction_data["document_type"])
+                training_record = TrainingRecord.from_dict(
+                    extraction_data,
+                    document_type=document_type,
+                )
+
+            result = ProcessingResult(
+                pdf_path=path,
+                document_type=document_type,
+                training_record=training_record,
+                success=True,
+                error_message=None,
+                processing_time_seconds=perf_counter() - start_time,
+                image_path=image_path,
+                confidence=training_record.confidence,
+            )
+        except Exception as exc:
+            result = ProcessingResult(
+                pdf_path=path,
+                document_type=document_type,
+                training_record=None,
+                success=False,
+                error_message=str(exc),
+                processing_time_seconds=perf_counter() - start_time,
+                image_path=image_path,
+                confidence=None,
+            )
+
+        logger.info(
+            "Finished document processing: %s success=%s elapsed=%.2fs",
+            path,
+            result.success,
+            result.processing_time_seconds,
+        )
+
+        return result
+
+    def _document_type_from_folder(self, pdf_path: Path) -> DocumentType:
+        """Infer document type from the parent folder."""
+
+        folder = (
+            pdf_path.parent.name
+            .lower()
+            .replace("-", " ")
+            .replace("_", " ")
+        )
+        folder = " ".join(folder.split())
+
+        mapping = {
+            "pre start briefing": DocumentType.ACTIVITY_BRIEFING,
+            "induction": DocumentType.INDUCTION,
+            "task specific hse training": DocumentType.TASK_SPECIFIC_HSE_TRAINING,
+            "toolbox talk": DocumentType.TOOLBOX_TALK,
+            "emergency drill": DocumentType.EMERGENCY_DRILL,
+            "hse campaign": DocumentType.HSE_CAMPAIGN,
+        }
+
+        return mapping.get(folder, DocumentType.UNKNOWN)
