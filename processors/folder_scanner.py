@@ -1,8 +1,9 @@
 from pathlib import Path
 
 TRAINING_TYPE_MAP = {
-    "trainings": "Toolbox Talk",
-    "training": "Toolbox Talk",
+    "trainings": "Task Specific HSE Training",
+    "training": "Task Specific HSE Training",
+    "hse training": "Task Specific HSE Training",
 
     "inductions": "Induction",
     "induction": "Induction",
@@ -18,7 +19,7 @@ TRAINING_TYPE_MAP = {
     "hse drill": "Emergency Drill",
     "drill": "Emergency Drill",
 
-    "hse training": "Task Specific HSE Training",
+    "hse tbt": "Toolbox Talk",
 }
 
 
