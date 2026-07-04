@@ -13,6 +13,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from processors.batch_pipeline import BatchPipeline
+from exporters.excel_exporter import ExcelExporter
+from datetime import datetime
 
 
 def main() -> None:
@@ -39,6 +41,19 @@ def main() -> None:
     pipeline = BatchPipeline()
 
     result = pipeline.process_folder(folder)
+
+    output_folder = Path("output")
+    output_folder.mkdir(exist_ok=True)
+
+    output_file = (
+        output_folder
+        / f"HSE_Training_Register_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    )
+
+    ExcelExporter().export(result, output_file)
+
+    print()
+    print(f"Excel workbook saved to: {output_file.resolve()}")
 
     print()
     print("=" * 60)

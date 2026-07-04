@@ -49,11 +49,11 @@ class DocumentPipeline:
             image_path = rendered_page.image_path
 
             extraction = self.ai_engine.extract(
-                document_type=document_type,
+                document_type=document_type.value,
                 image=rendered_page.image,
                 metadata={
                     "pdf_path": str(path),
-                    "document_type": document_type,
+                    "document_type": document_type.value,
                 },
             )
             extraction_data = extraction if isinstance(extraction, dict) else extraction.to_dict()
