@@ -57,7 +57,7 @@ class FolderScanner:
                         training_type = value
                         break
 
-                pdf_count = len(list(folder.glob("*.pdf")))
+                pdf_count = len(list(folder.rglob("*.pdf")))
 
                 month_result["folders"].append({
                     "folder": folder.name,
