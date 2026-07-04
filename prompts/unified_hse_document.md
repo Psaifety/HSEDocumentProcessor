@@ -26,6 +26,15 @@ If you are uncertain, choose the closest matching document type.
 
 Do not invent new document types.
 
+If the document title or form heading clearly identifies the document type, always use the heading in preference to the document content.
+
+Examples:
+
+- DAILY PRE-START BRIEFING → Activity Briefing
+- TRAINING ATTENDANCE SHEET → Task Specific HSE Training
+- HSE INDUCTION → Induction
+- TOOLBOX TALK → Toolbox Talk
+
 ---
 
 ## Step 2 - Extract Information
@@ -34,29 +43,54 @@ Extract the following information where available.
 
 ### Training Subject
 
-The title or subject of the training or briefing.
+### Training Subject
 
-Examples:
+Return the most specific work activity or training subject available.
 
+Prefer:
+
+1. Training Subject
+2. Task Title
+3. Work Activity
+4. Briefing Title
+
+Avoid generic titles when a more specific activity is available.
+
+Good examples:
+
+- Electrical Conduit Light Fitting and Labelling
 - Manual Handling
 - Safe Use of PPE
 - Electrical Cable Insulation
-- Light Fitting
 
-Return null if unavailable.
+Less preferred:
+
+- Electrical Works
+- Daily Briefing
 
 ---
 
 ### Trainer
 
-Return the person delivering the training.
+The trainer may also appear as:
 
-Examples:
+- Supervisor
+- Responsible Supervisor
+- Conducted By
+- Instructor
+- Presenter
+- Briefed By
 
-- P.B. Tripathy
-- Shaji KM
+For Activity Briefings, the trainer is often the Responsible Supervisor.
 
-If no trainer exists, return null.
+Return the person's name only.
+
+Do not return job titles.
+
+Normalise names where possible by removing unnecessary spaces and duplicate punctuation while preserving initials.
+
+Example:
+P. B. Tripathy → P.B. Tripathy
 
 ---
 
@@ -104,11 +138,25 @@ If the number cannot be determined return null.
 
 Do NOT estimate.
 
+If the attendee list is not visible on the supplied page, return null rather than estimating.
+
 ---
 
 ### Hazard Category
 
 Choose EXACTLY ONE hazard category from this approved list.
+
+First, look for a hazard category explicitly written on the document.
+
+If none exists, infer the single best category from:
+- the work activity
+- the training subject
+- the task title
+- the hazards discussed
+
+Never return more than one category.
+Never invent a category.
+Only use one from the approved list.
 
 - Slips, Trips & Falls
 - Manual Handling
@@ -166,19 +214,23 @@ Choose the single best category.
 
 If none are appropriate return null.
 
+If two sources of information conflict, prefer the more clearly printed and more complete source.
+
 ---
 
 ## Confidence
 
-Return a confidence score between
+Return a confidence score between 0.00 and 1.00 representing your confidence in the overall extraction.
 
-0.00
+Guidance:
 
-and
+1.00 = All key fields clearly visible and confidently extracted.
 
-1.00
+0.80 = Minor OCR ambiguity but extraction is reliable.
 
-representing your confidence in the extraction.
+0.60 = Several fields inferred from context.
+
+Below 0.60 = Significant uncertainty or poor image quality.
 
 ---
 
@@ -218,3 +270,5 @@ When extracting information use the following order of importance:
 4. Context
 
 Never infer information that is not visible.
+
+If two sources of information conflict, prefer the more clearly printed and more complete source.

@@ -51,6 +51,12 @@ class ExcelExporter:
         ),
 
         (
+            "File Path",
+            lambda result, index:
+            str(result.pdf_path),
+        ),
+
+        (
             "Details (Subject)",
             lambda result, index:
             result.training_record.training_subject
@@ -81,7 +87,7 @@ class ExcelExporter:
         (
             "Topic (Hazard Category)",
             lambda result, index:
-            ", ".join(result.training_record.hazard_categories)
+            result.training_record.hazard_category
             if result.training_record else "",
         ),
 
@@ -99,6 +105,13 @@ class ExcelExporter:
             if result.training_record else "",
         ),
 
+        (
+            "Confidence",
+            lambda result, index:
+            result.training_record.confidence
+            if result.training_record else "",
+        ),
+
     ]
 
     def export(
@@ -111,7 +124,7 @@ class ExcelExporter:
         workbook = Workbook()
 
         training_sheet = workbook.active
-        training_sheet.title = "Training Records"
+        training_sheet.title = "HSE Training Register"
 
         summary_sheet = workbook.create_sheet(
             "Processing Summary"
@@ -172,13 +185,22 @@ class ExcelExporter:
 
                 cell.border = self.THIN_BORDER
 
+                if self.COLUMNS[column - 1][0] == "Confidence" and isinstance(value, (int, float)):
+                    if value < 0.60:
+                        cell.fill = PatternFill(fill_type="solid", fgColor="FFC7CE")
+                    elif value < 0.80:
+                        cell.fill = PatternFill(fill_type="solid", fgColor="FFEB9C")
+                    else:
+                        cell.fill = PatternFill(fill_type="solid", fgColor="C6EFCE")
+
                 # Date formatting
-                if column == 4 and value:
+                if self.COLUMNS[column - 1][0] == "Date" and value:
                     cell.number_format = "DD/MM/YYYY"
 
             row += 1
 
         worksheet.freeze_panes = "A2"
+        worksheet.sheet_view.showGridLines = True
         worksheet.auto_filter.ref = worksheet.dimensions
 
         self._auto_size_columns(worksheet)
