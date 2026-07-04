@@ -1,91 +1,91 @@
-"""Document processing pipeline orchestration."""
+<file name=ai/ai_engine.py path=/Users/praxsenghani/Projects/HistoricTrainingRecords/ai/ai_engine.py>TRAINING_RECORD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "document_type": {"type": "string"},
+        "training_subject": {"type": "string"},
+        "trainer": {"type": "string"},
+        "date": {"type": "string", "format": "date"},
+        "duration": {"type": "string"},
+        "number_of_attendees": {"type": "integer"},
+        "hazard_category": {"type": "string"},
+        "confidence": {"type": ["number", "null"]},
+        # other fields...
+    },
+    "required": [
+        "document_type",
+        "training_subject",
+        "trainer",
+        "date",
+        "duration",
+        "number_of_attendees",
+        "hazard_category",
+        "confidence",
+    ],
+    "additionalProperties": True,
+}
+</file>
 
-from __future__ import annotations
+<file name=models/training_record.py path=/Users/praxsenghani/Projects/HistoricTrainingRecords/models/training_record.py>import re
 
-import logging
-from pathlib import Path
-from time import perf_counter
+class TrainingRecord:
+    # existing code...
 
-from ai import AIExtractionEngine
-from models import DocumentType, ProcessingResult, TrainingRecord
-from processors.document_classifier import DocumentClassifier
-from processors.pdf_processor import PDFProcessor
+    @staticmethod
+    def _parse_hazard_category(value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        # Normalize repeated whitespace to single spaces
+        normalized = re.sub(r'\s+', ' ', trimmed)
+        return normalized
 
-logger = logging.getLogger(__name__)
+    @staticmethod
+    def _normalise_trainer_name(value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        # Collapse repeated whitespace
+        collapsed = re.sub(r'\s+', ' ', trimmed)
+        # Remove spaces immediately after initials like "P. B." -> "P.B."
+        normalized = re.sub(r'(\b[A-Z]\.)\s+(?=[A-Z]\.)', r'\1', collapsed)
+        return normalized
 
+    @classmethod
+    def from_dict(cls, data: dict, document_type: DocumentType) -> TrainingRecord:
+        # existing parsing logic...
+        trainer_raw = data.get("trainer")
+        trainer = cls._normalise_trainer_name(trainer_raw)
+        # use trainer in creating TrainingRecord instance
+        # rest of from_dict code unchanged except using normalized trainer
+</file>
 
-class DocumentPipeline:
-    """Run classification, rendering, and AI extraction for a single PDF."""
+<file name=exporters/excel_exporter.py path=/Users/praxsenghani/Projects/HistoricTrainingRecords/exporters/excel_exporter.py>from openpyxl.styles import PatternFill
 
-    def __init__(
-        self,
-        *,
-        classifier: DocumentClassifier | None = None,
-        pdf_processor: PDFProcessor | None = None,
-        ai_engine: AIExtractionEngine | None = None,
-    ) -> None:
-        self.classifier = classifier or DocumentClassifier()
-        self.pdf_processor = pdf_processor or PDFProcessor()
-        self.ai_engine = ai_engine or AIExtractionEngine()
+# existing code...
 
-    def process(self, pdf_path: Path) -> ProcessingResult:
-        """Process one PDF from classification through AI extraction."""
+def export_training_records_to_excel(records: list[TrainingRecord], filename: str) -> None:
+    # existing setup code...
 
-        start_time = perf_counter()
-        path = Path(pdf_path)
-        document_type = DocumentType.UNKNOWN
-        image_path: Path | None = None
+    # Define fills for confidence highlighting
+    light_red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+    light_amber_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
 
-        logger.info("Starting document processing: %s", path)
+    for row_idx, record in enumerate(records, start=2):
+        # existing code to write columns...
 
-        try:
-            if not path.exists() or not path.is_file():
-                raise FileNotFoundError(f"PDF file does not exist: {path}")
+        # Write hazard_category column (new field)
+        hazard_category = record.hazard_category
+        worksheet.cell(row=row_idx, column=hazard_category_col_index, value=hazard_category)
 
-            document_type = DocumentType.from_value(self.classifier.classify(path))
-            rendered_page = self.pdf_processor.render_first_page(path)
-            image_path = rendered_page.image_path
+        # Apply confidence fill if confidence exists
+        confidence = record.confidence
+        if confidence is not None:
+            cell = worksheet.cell(row=row_idx, column=confidence_col_index)
+            if confidence < 0.60:
+                cell.fill = light_red_fill
+            elif confidence < 0.80:
+                cell.fill = light_amber_fill
+        # rest of loop unchanged
 
-            extraction_data = self.ai_engine.extract(
-                document_type=document_type.value,
-                image=rendered_page.image,
-                metadata={
-                    "pdf_path": str(path),
-                    "document_type": document_type.value,
-                },
-            )
-            training_record = TrainingRecord.from_dict(
-                extraction_data,
-                document_type=document_type,
-            )
-
-            result = ProcessingResult(
-                pdf_path=path,
-                document_type=document_type,
-                training_record=training_record,
-                success=True,
-                error_message=None,
-                processing_time_seconds=perf_counter() - start_time,
-                image_path=image_path,
-                confidence=training_record.confidence,
-            )
-        except Exception as exc:
-            result = ProcessingResult(
-                pdf_path=path,
-                document_type=document_type,
-                training_record=None,
-                success=False,
-                error_message=str(exc),
-                processing_time_seconds=perf_counter() - start_time,
-                image_path=image_path,
-                confidence=None,
-            )
-
-        logger.info(
-            "Finished document processing: %s success=%s elapsed=%.2fs",
-            path,
-            result.success,
-            result.processing_time_seconds,
-        )
-
-        return result
+    # existing save code...
+</file>

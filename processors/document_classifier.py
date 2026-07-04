@@ -28,22 +28,56 @@ class DocumentClassifier:
 
         text = pytesseract.image_to_string(page).upper()
 
-        if "DAILY PRE-START BRIEFING" in text:
+        normalized = (
+            text.replace("-", " ")
+                .replace("—", " ")
+                .replace("_", " ")
+                .replace("/", " ")
+                .replace("\n", " ")
+                .replace("\r", " ")
+        )
+
+        normalized = " ".join(normalized.split())
+
+        print("=" * 80)
+        print(pdf_path.name)
+        print(text[:1500])   # first 1500 characters
+        print("=" * 80)
+
+        if (
+            "PRE START" in normalized
+            and "BRIEFING" in normalized
+        ):
             return "Activity Briefing"
 
-        if "EMERGENCY EVACUATION" in text:
+        if "EMERGENCY EVACUATION" in normalized:
             return "Emergency Drill"
 
-        if "TOOLBOX TALK" in text:
-            return "Toolbox Talk"
+        if (
+            "TOOLBOX" in normalized
+            and "TALK" in normalized
+        ):
+             return "Toolbox Talk"
 
-        if "INDUCTION" in text:
+        if "INDUCTION" in normalized:
             return "Induction"
 
-        if "TRAINING ATTENDANCE SHEET" in text:
+        if (
+            "TRAINING" in normalized
+            and "ATTENDANCE" in normalized
+        ):
             return "Task Specific HSE Training"
 
-        if "CAMPAIGN" in text:
+        if "CAMPAIGN" in normalized:
             return "HSE Campaign"
+
+        print()
+        print("=" * 80)
+        print("UNKNOWN DOCUMENT")
+        print(pdf_path.name)
+        print()
+        print(normalized[:500])
+        print("=" * 80)
+        print()
 
         return "Unknown"

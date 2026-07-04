@@ -18,6 +18,8 @@ class TrainingRecord:
     trainer: str | None
     date: date | None
     duration_text: str | None
+    number_of_attendees: int | None = None
+    hazard_category: str | None = None
     confidence: float | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -47,6 +49,14 @@ class TrainingRecord:
             duration_text=_optional_string(
                 data.get("duration_text", data.get("duration"))
             ),
+            number_of_attendees=_parse_int(
+                data.get("number_of_attendees")
+                or data.get("attendee_count")
+            ),
+            hazard_category=_parse_hazard_category(
+                data.get("hazard_category")
+                or data.get("hazard_categories")
+            ),
             confidence=_parse_confidence(data.get("confidence")),
             metadata=record_metadata,
         )
@@ -62,6 +72,8 @@ class TrainingRecord:
             "duration_text": self.duration_text,
             "confidence": self.confidence,
             "metadata": self.metadata,
+            "number_of_attendees": self.number_of_attendees,
+            "hazard_category": self.hazard_category,
         }
 
     def __str__(self) -> str:
@@ -70,10 +82,17 @@ class TrainingRecord:
         subject = self.training_subject or "Unknown subject"
         trainer = self.trainer or "Unknown trainer"
         record_date = self.date.isoformat() if self.date else "Unknown date"
+        attendees = (
+            str(self.number_of_attendees)
+            if self.number_of_attendees is not None else "Unknown"
+        )
         return (
             f"{self.document_type.value}: {subject} | "
-            f"Trainer: {trainer} | Date: {record_date}"
+            f"Trainer: {trainer} | "
+            f"Date: {record_date} | "
+            f"Attendees: {attendees}"
         )
+        
 
 
 def _optional_string(value: Any) -> str | None:
@@ -109,6 +128,49 @@ def _parse_confidence(value: Any) -> float | None:
 
     return None
 
+def _parse_int(value: Any) -> int | None:
+    """Parse an integer value."""
+
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, float):
+        return int(value)
+
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+
+    return None
+
+def _parse_hazard_category(value: Any) -> str | None:
+    """Return a single hazard category."""
+
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+
+    if isinstance(value, list):
+        for item in value:
+            text = str(item).strip()
+            if text:
+                return text
+        return None
+
+    text = str(value).strip()
+    return text or None
+
 
 def _parse_date(value: Any) -> date | None:
     """Parse common date representations into ``datetime.date``."""
@@ -140,6 +202,7 @@ def _parse_date(value: Any) -> date | None:
         "%d.%m.%y",
         "%d %b %Y",
         "%d %B %Y",
+        "%d %b %y",
     ):
         try:
             return datetime.strptime(text, date_format).date()

@@ -21,12 +21,30 @@ TRAINING_RECORD_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
+        "document_type": {
+            "type": ["string", "null"],
+            "enum": [
+                "Induction",
+                "Task Specific HSE Training",
+                "Activity Briefing",
+                "Toolbox Talk",
+                "Emergency Drill",
+                "HSE Campaign",
+                "Unknown",
+                None,
+            ],
+        },
+        "number_of_attendees": {"type": ["integer", "null"]},
+        "hazard_category": {"type": ["string", "null"]},
         "training_subject": {"type": ["string", "null"]},
         "trainer": {"type": ["string", "null"]},
         "date": {"type": ["string", "null"]},
         "duration": {"type": ["string", "null"]},
     },
     "required": [
+        "document_type",
+        "number_of_attendees",
+        "hazard_category",
         "training_subject",
         "trainer",
         "date",
@@ -68,6 +86,9 @@ class InvalidAIResponseError(AIExtractionError):
 class TrainingExtraction:
     """Structured fields extracted from a training attendance sheet."""
 
+    document_type: str | None
+    number_of_attendees: int | None
+    hazard_category: str | None
     training_subject: str | None
     trainer: str | None
     date: str | None
@@ -78,13 +99,16 @@ class TrainingExtraction:
         """Build a typed extraction result from model JSON."""
 
         return cls(
+            document_type=_optional_string(data.get("document_type")),
+            number_of_attendees=_optional_int(data.get("number_of_attendees")),
+            hazard_category=_optional_string(data.get("hazard_category")),
             training_subject=_optional_string(data.get("training_subject")),
             trainer=_optional_string(data.get("trainer")),
             date=_optional_string(data.get("date")),
             duration=_optional_string(data.get("duration")),
         )
 
-    def to_dict(self) -> dict[str, str | None]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation of the extraction."""
 
         return asdict(self)
@@ -134,7 +158,7 @@ class AIExtractionEngine:
         self,
         image: Path | str | Image.Image,
         *,
-        prompt_name: str = "task_specific_training",
+        prompt_name: str = "unified_hse_document",
         metadata: dict[str, Any] | None = None,
     ) -> TrainingExtraction:
         """Extract training fields from an image using the Responses API."""
@@ -255,10 +279,19 @@ class AIExtractionEngine:
         return TrainingExtraction.from_dict(data)
 
 
+
 def _optional_string(value: Any) -> str | None:
     """Return ``value`` if it is a string, otherwise ``None``."""
 
     if value is None or isinstance(value, str):
+        return value
+
+    return None
+
+def _optional_int(value: Any) -> int | None:
+    """Return ``value`` if it is an integer, otherwise ``None``."""
+
+    if value is None or isinstance(value, int):
         return value
 
     return None
