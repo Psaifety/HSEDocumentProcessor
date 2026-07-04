@@ -1,1 +1,37 @@
 config/.env
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# Runtime logs and generated JSONL output
+logs/
+log/
+*.log
+
+# Test/debug render outputs
+tests/*.png
+tests/*.jpg
+tests/*.jpeg
+tests/*.tif
+tests/*.tiff
+tests/*.bmp
+tests/*.webp
+
+# Test and coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# OS/editor noise
+.DS_Store

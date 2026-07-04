@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Any
 
 from ai import AIExtractionEngine
-from models import ProcessingResult
+from models import DocumentType, ProcessingResult, TrainingRecord
 from processors.document_classifier import DocumentClassifier
 from processors.pdf_processor import PDFProcessor
 
@@ -35,7 +33,7 @@ class DocumentPipeline:
 
         start_time = perf_counter()
         path = Path(pdf_path)
-        document_type = "Unknown"
+        document_type = DocumentType.UNKNOWN
         image_path: Path | None = None
 
         logger.info("Starting document processing: %s", path)
@@ -44,36 +42,38 @@ class DocumentPipeline:
             if not path.exists() or not path.is_file():
                 raise FileNotFoundError(f"PDF file does not exist: {path}")
 
-            document_type = self.classifier.classify(path)
+            document_type = DocumentType.from_value(self.classifier.classify(path))
             rendered_page = self.pdf_processor.render_first_page(path)
             image_path = rendered_page.image_path
 
-            extraction = self.ai_engine.extract(
-                document_type=document_type,
+            extraction_data = self.ai_engine.extract(
+                document_type=document_type.value,
                 image=rendered_page.image,
                 metadata={
                     "pdf_path": str(path),
-                    "document_type": document_type,
+                    "document_type": document_type.value,
                 },
             )
-            extracted_data = _to_dict(extraction)
-            confidence = _extract_confidence(extracted_data)
+            training_record = TrainingRecord.from_dict(
+                extraction_data,
+                document_type=document_type,
+            )
 
             result = ProcessingResult(
                 pdf_path=path,
                 document_type=document_type,
-                extracted_data=extracted_data,
+                training_record=training_record,
                 success=True,
                 error_message=None,
                 processing_time_seconds=perf_counter() - start_time,
                 image_path=image_path,
-                confidence=confidence,
+                confidence=training_record.confidence,
             )
         except Exception as exc:
             result = ProcessingResult(
                 pdf_path=path,
                 document_type=document_type,
-                extracted_data={},
+                training_record=None,
                 success=False,
                 error_message=str(exc),
                 processing_time_seconds=perf_counter() - start_time,
@@ -89,29 +89,3 @@ class DocumentPipeline:
         )
 
         return result
-
-
-def _to_dict(value: Any) -> dict[str, Any]:
-    """Convert an extraction object into a dictionary."""
-
-    if isinstance(value, dict):
-        return value
-
-    if hasattr(value, "to_dict"):
-        return value.to_dict()
-
-    if is_dataclass(value):
-        return asdict(value)
-
-    raise TypeError(f"Unsupported extraction result type: {type(value).__name__}")
-
-
-def _extract_confidence(extracted_data: dict[str, Any]) -> float | None:
-    """Return a generic confidence value from extraction data when present."""
-
-    confidence = extracted_data.get("confidence")
-
-    if isinstance(confidence, int | float):
-        return float(confidence)
-
-    return None

@@ -47,7 +47,12 @@ def main() -> int:
     result = DocumentPipeline().process(pdf_path)
     total_processing_time = perf_counter() - start_time
 
-    print(json.dumps(result.to_dict(), indent=4, ensure_ascii=False))
+    if result.training_record:
+        print(result.training_record)
+        print(json.dumps(result.training_record.to_dict(), indent=4, ensure_ascii=False))
+    else:
+        print(json.dumps(result.to_dict(), indent=4, ensure_ascii=False))
+
     print(f"\nTotal processing time: {total_processing_time:.2f} seconds")
 
     return 0 if result.success else 1
