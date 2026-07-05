@@ -35,3 +35,13 @@ dist/
 
 # OS/editor noise
 .DS_Store
+
+# Environment variables
+.env
+
+# Generated output
+output/*
+!output/.gitkeep
+
+# Microsoft Office temporary files
+~$*.xlsx
